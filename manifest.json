@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Discogs → TWD 比價助手",
+  "version": "1.0.0",
+  "description": "在 Discogs 逛唱片時，自動把售價＋運費＋台灣進口稅估算換算成新台幣，直接顯示在原價旁邊方便比價。",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.discogs.com/*",
+    "https://open.er-api.com/*",
+    "https://cdn.jsdelivr.net/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.discogs.com/*"],
+      "js": ["src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "src/options.html",
+  "action": {
+    "default_title": "Discogs → TWD 設定",
+    "default_popup": "src/options.html"
+  }
+}

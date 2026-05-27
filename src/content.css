@@ -1,0 +1,21 @@
+.dtwd-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 7px;
+  background: #e7f3ea;
+  color: #1a6b2e;
+  border: 1px solid #bfe0c8;
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.dtwd-badge.dtwd-error {
+  background: #f8e7e7;
+  color: #a33;
+  border-color: #e3bcbc;
+}

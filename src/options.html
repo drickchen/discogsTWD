@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Discogs → TWD 設定</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <h1>Discogs → TWD 比價助手</h1>
+
+    <label class="row toggle">
+      <input type="checkbox" id="enabled" />
+      <span>啟用換算（關閉後重整 Discogs 頁面即不顯示）</span>
+    </label>
+
+    <fieldset>
+      <legend>台灣進口稅估算</legend>
+
+      <label class="row">
+        <span>免稅門檻（完稅價格 NT$ 以下免徵）</span>
+        <input type="number" id="dutyFreeThreshold" min="0" step="100" />
+      </label>
+
+      <label class="row">
+        <span>關稅率（%）<small>唱片類多為低/零關稅</small></span>
+        <input type="number" id="customsRate" min="0" max="100" step="0.5" />
+      </label>
+
+      <label class="row">
+        <span>營業稅率（%）</span>
+        <input type="number" id="businessTaxRate" min="0" max="100" step="0.5" />
+      </label>
+
+      <p class="hint">
+        估算方式：完稅價格 = 商品 ＋ 運費（折台幣）。超過免稅門檻才課
+        關稅 ＋ 營業稅；門檻以下免徵。此為概算，實際以海關核定為準。
+      </p>
+    </fieldset>
+
+    <label class="row toggle">
+      <input type="checkbox" id="showBreakdown" />
+      <span>滑鼠移到台幣徽章上顯示明細</span>
+    </label>
+
+    <div class="actions">
+      <button id="save" type="button">儲存設定</button>
+      <button id="refresh" type="button" class="secondary">立即更新匯率</button>
+    </div>
+
+    <p id="status" class="status"></p>
+    <p id="rateInfo" class="rateinfo"></p>
+
+    <script src="options.js"></script>
+  </body>
+</html>

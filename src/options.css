@@ -1,0 +1,109 @@
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif;
+  margin: 0;
+  padding: 16px;
+  width: 340px;
+  color: #222;
+  background: #fff;
+  font-size: 14px;
+}
+
+h1 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+fieldset {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin: 12px 0;
+  padding: 10px 12px;
+}
+
+legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.row > span {
+  flex: 1;
+}
+
+.row small {
+  display: block;
+  color: #888;
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.row.toggle {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+input[type="number"] {
+  width: 90px;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  text-align: right;
+}
+
+.hint {
+  color: #777;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+button {
+  flex: 1;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: #1a6b2e;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #e7f3ea;
+  color: #1a6b2e;
+  border: 1px solid #bfe0c8;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+.status {
+  min-height: 16px;
+  margin: 10px 0 0;
+  color: #1a6b2e;
+  font-size: 13px;
+}
+
+.rateinfo {
+  margin: 4px 0 0;
+  color: #888;
+  font-size: 12px;
+}
