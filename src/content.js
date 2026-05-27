@@ -1,34 +1,41 @@
-// Discogs → TWD : 掃描頁面價格，換算成台幣後貼在原價旁邊
+// Discogs → TWD : 掃描頁面價格換算成台幣，並移除無法寄送台灣的商品
 (function () {
   "use strict";
 
   const DEFAULTS = {
     enabled: true,
-    customsRate: 0,        // 關稅率 (%)，唱片類多為低/零關稅，可自行調整
-    businessTaxRate: 5,    // 營業稅率 (%)
-    dutyFreeThreshold: 2000, // 完稅價格 (NT$) 在此以下免徵關稅及營業稅
-    showBreakdown: true,   // 滑鼠移上去顯示明細
+    customsRate: 0,           // 關稅率 (%)，唱片類多為低/零關稅，可自行調整
+    businessTaxRate: 5,       // 營業稅率 (%)
+    dutyFreeThreshold: 2000,  // 完稅價格 (NT$) 在此以下免徵關稅及營業稅
+    showBreakdown: true,      // 滑鼠移上去顯示明細
+    hideUnavailable: true,    // 移除/隱藏「Unavailable in Taiwan」的商品
   };
 
   let SETTINGS = { ...DEFAULTS };
   let RATES = null; // { table, date, source }
 
+  const IS_CHECKOUT = /\/sell\/(cart|order|checkout|payment|buyer)/i.test(location.pathname);
+
+  // 同時抓「符號在前」(US$15.00 / €12) 與三碼幣別碼。NT$ 先排除避免把台幣再換一次
+  const CUR_RE =
+    /(NT\$|US\$|CA\$|A\$|NZ\$|HK\$|MX\$|R\$|CHF|[$€£¥₩])\s?(\d[\d.,]*\d|\d)/;
+
   // ---- 幣別/金額解析 -------------------------------------------------------
 
   function detectCurrency(str) {
+    if (/NT\s?\$/.test(str)) return "TWD";
     if (/US\s?\$/.test(str)) return "USD";
     if (/CA\s?\$/.test(str)) return "CAD";
     if (/A\s?\$/.test(str)) return "AUD";
     if (/NZ\s?\$/.test(str)) return "NZD";
     if (/HK\s?\$/.test(str)) return "HKD";
-    if (/R\s?\$/.test(str)) return "BRL";
     if (/MX\s?\$/.test(str)) return "MXN";
+    if (/R\$|reais/i.test(str)) return "BRL";
     if (/€/.test(str)) return "EUR";
     if (/£/.test(str)) return "GBP";
     if (/¥/.test(str)) return "JPY";
     if (/₩/.test(str)) return "KRW";
     if (/zł/i.test(str)) return "PLN";
-    if (/R\$|reais/i.test(str)) return "BRL";
     if (/CHF/i.test(str)) return "CHF";
     if (/\$/.test(str)) return "USD";
     const code = str.match(/\b([A-Z]{3})\b/);
@@ -44,11 +51,8 @@
     const lastComma = s.lastIndexOf(",");
     const lastDot = s.lastIndexOf(".");
     if (lastComma > -1 && lastDot > -1) {
-      if (lastComma > lastDot) {
-        s = s.replace(/\./g, "").replace(",", "."); // 逗號當小數點
-      } else {
-        s = s.replace(/,/g, ""); // 逗號當千分位
-      }
+      if (lastComma > lastDot) s = s.replace(/\./g, "").replace(",", ".");
+      else s = s.replace(/,/g, "");
     } else if (lastComma > -1) {
       const after = s.length - lastComma - 1;
       s = after === 1 || after === 2 ? s.replace(",", ".") : s.replace(/,/g, "");
@@ -56,7 +60,7 @@
     return parseFloat(s);
   }
 
-  // 從元素讀出 {currency, value}，優先用 Discogs 的 data 屬性
+  // 從元素的 data 屬性或文字讀出 {currency, value}
   function readPrice(el) {
     if (!el) return null;
     const cur = el.dataset && el.dataset.currency ? el.dataset.currency.toUpperCase() : null;
@@ -77,7 +81,7 @@
     return amount * (t.TWD / t[currency]);
   }
 
-  // 回傳台幣明細，找不到匯率回 null
+  // 商品＋運費 → 含台灣進口稅估算的到手台幣，找不到匯率回 null
   function computeTWD(itemPrice, shipPrice) {
     const itemTWD = toTWD(itemPrice.value, itemPrice.currency);
     if (itemTWD == null) return null;
@@ -97,31 +101,42 @@
       customs = cif * (SETTINGS.customsRate / 100);
       vat = (cif + customs) * (SETTINGS.businessTaxRate / 100);
     }
-    const total = cif + customs + vat;
-    return { itemTWD, shipTWD, shipKnown, customs, vat, total, taxFree: cif <= SETTINGS.dutyFreeThreshold };
+    return {
+      itemTWD,
+      shipTWD,
+      shipKnown,
+      customs,
+      vat,
+      total: cif + customs + vat,
+      taxFree: cif <= SETTINGS.dutyFreeThreshold,
+    };
   }
 
-  // ---- 注入畫面 ------------------------------------------------------------
+  // ---- 徽章 ----------------------------------------------------------------
 
   const ntd = (n) => "NT$" + Math.round(n).toLocaleString("en-US");
 
-  function buildBadge(r) {
-    const badge = document.createElement("span");
-    badge.className = "dtwd-badge";
-    badge.textContent = "≈ " + ntd(r.total);
-    if (SETTINGS.showBreakdown) {
-      const lines = [
-        "商品 " + ntd(r.itemTWD),
-        r.shipKnown ? "運費 " + ntd(r.shipTWD) : "運費 未列於頁面",
-        r.taxFree
-          ? "稅金 免徵（完稅價 ≤ " + ntd(SETTINGS.dutyFreeThreshold) + "）"
-          : "關稅 " + ntd(r.customs) + " ＋ 營業稅 " + ntd(r.vat),
-        "── 合計 " + ntd(r.total) + " （估算）",
-      ];
-      badge.title = lines.join("\n");
-    }
-    return badge;
+  function makeBadge(textContent, title) {
+    const b = document.createElement("span");
+    b.className = "dtwd-badge";
+    b.textContent = textContent;
+    if (title && SETTINGS.showBreakdown) b.title = title;
+    return b;
   }
+
+  function landedBadge(r) {
+    const title = [
+      "商品 " + ntd(r.itemTWD),
+      r.shipKnown ? "運費 " + ntd(r.shipTWD) : "運費 未列於頁面",
+      r.taxFree
+        ? "稅金 免徵（完稅價 ≤ " + ntd(SETTINGS.dutyFreeThreshold) + "）"
+        : "關稅 " + ntd(r.customs) + " ＋ 營業稅 " + ntd(r.vat),
+      "── 合計 " + ntd(r.total) + " （估算）",
+    ].join("\n");
+    return makeBadge("≈ " + ntd(r.total), title);
+  }
+
+  // ---- 列表/商品頁：以 .price 為主 -----------------------------------------
 
   function scopeOf(el) {
     return (
@@ -130,17 +145,15 @@
     );
   }
 
-  function process(root) {
-    if (!SETTINGS.enabled || !RATES) return;
-    const priceEls = root.querySelectorAll(".price");
-    priceEls.forEach((el) => {
+  function scanListings(root) {
+    root.querySelectorAll(".price").forEach((el) => {
       if (el.dataset.dtwdDone === "1") return;
       el.dataset.dtwdDone = "1";
 
       const item = readPrice(el);
       if (!item || item.currency === "TWD") return;
 
-      // 只讀頁面顯示的運費，找不到就當未列（不估算）
+      // 只讀頁面顯示的運費，找不到當未列（不估算）
       const scope = scopeOf(el);
       let ship = null;
       if (scope) {
@@ -152,14 +165,110 @@
       }
 
       const r = computeTWD(item, ship);
-      if (!r) return;
-
-      const badge = buildBadge(r);
-      el.insertAdjacentElement("afterend", badge);
+      if (r) el.insertAdjacentElement("afterend", landedBadge(r));
     });
   }
 
-  // ---- 動態頁面監看 --------------------------------------------------------
+  // ---- 結帳/購物車頁：全頁掃描貨幣金額 -------------------------------------
+
+  function looksLikeTotal(el) {
+    const c = el.closest("tr, li, .row, .order-total, [class*='total' i]") || el.parentElement;
+    const t = (c && c.textContent ? c.textContent : "").toLowerCase();
+    return /total|總計|合計|grand/.test(t) && !/sub-?total|小計|item total/.test(t);
+  }
+
+  function collectTextNodes(root) {
+    const nodes = [];
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        const p = n.parentNode;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        const tag = p.nodeName;
+        if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEXTAREA" || tag === "OPTION")
+          return NodeFilter.FILTER_REJECT;
+        if (p.classList && p.classList.contains("dtwd-badge")) return NodeFilter.FILTER_REJECT;
+        if (p.dataset && p.dataset.dtwdDone === "1") return NodeFilter.FILTER_REJECT;
+        if (!n.nodeValue || !CUR_RE.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    let cur;
+    while ((cur = tw.nextNode())) nodes.push(cur);
+    return nodes;
+  }
+
+  function scanCheckout(root) {
+    collectTextNodes(root).forEach((node) => {
+      const m = node.nodeValue.match(CUR_RE);
+      if (!m) return;
+      const currency = detectCurrency(m[1]);
+      const value = parseAmount(m[2]);
+      const parent = node.parentNode;
+      if (!parent) return;
+      parent.dataset && (parent.dataset.dtwdDone = "1");
+      if (!currency || currency === "TWD" || !Number.isFinite(value)) return;
+
+      let badge;
+      if (parent.nodeType === 1 && looksLikeTotal(parent)) {
+        const r = computeTWD({ currency, value }, null);
+        if (!r) return;
+        badge = landedBadge(r);
+      } else {
+        const twd = toTWD(value, currency);
+        if (twd == null) return;
+        badge = makeBadge("≈ " + ntd(twd), "匯率換算（未計進口稅）");
+      }
+      parent.insertBefore(badge, node.nextSibling);
+    });
+  }
+
+  // ---- 移除無法寄送台灣的商品 ----------------------------------------------
+
+  const UNAVAIL_RE =
+    /(unavailable in (your country|taiwan))|(not available in (your country|taiwan))|((does not|doesn't|will not|won't|cannot|can't|unable to)\s+ship[^]*?\b(taiwan|your country))/i;
+
+  function killListing(el) {
+    const container =
+      el.closest(
+        "tr.shortcut_navigable, li.shortcut_navigable, .marketplace-item, .listing_block, .mp_listing, .card"
+      ) || el.closest("tr, li");
+    if (container && container.parentElement) {
+      container.remove();
+      return;
+    }
+    const block = el.closest("div, section, article") || el;
+    block.style.display = "none";
+  }
+
+  function removeUnavailable(root) {
+    if (!SETTINGS.hideUnavailable) return;
+    const candidates = collectUnavailNodes(root);
+    candidates.forEach((el) => killListing(el));
+  }
+
+  function collectUnavailNodes(root) {
+    const out = [];
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        const v = n.nodeValue;
+        if (!v || !UNAVAIL_RE.test(v)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    let cur;
+    while ((cur = tw.nextNode())) if (cur.parentElement) out.push(cur.parentElement);
+    return out;
+  }
+
+  // ---- 排程與監看 ----------------------------------------------------------
+
+  function processAll() {
+    if (!SETTINGS.enabled) return;
+    removeUnavailable(document);
+    if (!RATES) return;
+    if (IS_CHECKOUT) scanCheckout(document);
+    else scanListings(document);
+  }
 
   let pending = false;
   function scheduleScan() {
@@ -167,13 +276,15 @@
     pending = true;
     requestAnimationFrame(() => {
       pending = false;
-      process(document);
+      processAll();
     });
   }
 
   function observe() {
-    const obs = new MutationObserver(scheduleScan);
-    obs.observe(document.documentElement, { childList: true, subtree: true });
+    new MutationObserver(scheduleScan).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
   }
 
   // ---- 啟動 ----------------------------------------------------------------
@@ -183,19 +294,19 @@
     SETTINGS = { ...DEFAULTS, ...stored };
     if (!SETTINGS.enabled) return;
 
+    // 移除無法寄台灣的商品不需要等匯率，先跑
+    removeUnavailable(document);
+    observe();
+
     chrome.runtime.sendMessage({ type: "getRates" }, (resp) => {
       if (chrome.runtime.lastError || !resp || !resp.ok) return;
       RATES = { table: resp.table, date: resp.date, source: resp.source };
-      process(document);
-      observe();
+      processAll();
     });
 
-    // 設定變更後即時反映（重整頁面才會重算徽章，這裡先更新記憶體設定）
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
-      for (const k of Object.keys(changes)) {
-        if (k in SETTINGS) SETTINGS[k] = changes[k].newValue;
-      }
+      for (const k of Object.keys(changes)) if (k in SETTINGS) SETTINGS[k] = changes[k].newValue;
     });
   }
 

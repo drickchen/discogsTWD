@@ -5,7 +5,7 @@
   "description": "在 Discogs 逛唱片時，自動把售價＋運費＋台灣進口稅估算換算成新台幣，直接顯示在原價旁邊方便比價。",
   "permissions": ["storage"],
   "host_permissions": [
-    "https://www.discogs.com/*",
+    "https://*.discogs.com/*",
     "https://open.er-api.com/*",
     "https://cdn.jsdelivr.net/*"
   ],
@@ -14,7 +14,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.discogs.com/*"],
+      "matches": ["https://*.discogs.com/*"],
       "js": ["src/content.js"],
       "css": ["src/content.css"],
       "run_at": "document_idle"

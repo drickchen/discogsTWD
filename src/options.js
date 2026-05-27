@@ -4,6 +4,7 @@ const DEFAULTS = {
   businessTaxRate: 5,
   dutyFreeThreshold: 2000,
   showBreakdown: true,
+  hideUnavailable: true,
 };
 
 const FIELDS = {
@@ -12,6 +13,7 @@ const FIELDS = {
   businessTaxRate: "number",
   dutyFreeThreshold: "number",
   showBreakdown: "checkbox",
+  hideUnavailable: "checkbox",
 };
 
 function $(id) {
