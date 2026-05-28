@@ -5,6 +5,7 @@ const DEFAULTS = {
   dutyFreeThreshold: 2000,
   showBreakdown: true,
   hideUnavailable: true,
+  sortByTWD: true,
 };
 
 const FIELDS = {
@@ -14,6 +15,7 @@ const FIELDS = {
   dutyFreeThreshold: "number",
   showBreakdown: "checkbox",
   hideUnavailable: "checkbox",
+  sortByTWD: "checkbox",
 };
 
 function $(id) {

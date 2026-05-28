@@ -9,6 +9,7 @@
     dutyFreeThreshold: 2000,  // 完稅價格 (NT$) 在此以下免徵關稅及營業稅
     showBreakdown: true,      // 滑鼠移上去顯示明細
     hideUnavailable: true,    // 移除/隱藏「Unavailable in Taiwan」的商品
+    sortByTWD: true,          // 依台幣總價由低到高排序當頁列表
   };
 
   let SETTINGS = { ...DEFAULTS };
@@ -133,7 +134,9 @@
         : "關稅 " + ntd(r.customs) + " ＋ 營業稅 " + ntd(r.vat),
       "── 合計 " + ntd(r.total) + " （估算）",
     ].join("\n");
-    return makeBadge("≈ " + ntd(r.total), title);
+    const b = makeBadge("≈ " + ntd(r.total), title);
+    b.dataset.dtwdTotal = String(r.total);
+    return b;
   }
 
   // ---- 列表/商品頁：以 .price 為主 -----------------------------------------
@@ -166,6 +169,43 @@
 
       const r = computeTWD(item, ship);
       if (r) el.insertAdjacentElement("afterend", landedBadge(r));
+    });
+  }
+
+  // ---- 依台幣總價排序當頁列表 ---------------------------------------------
+
+  function sortByTWD(root) {
+    if (!SETTINGS.sortByTWD) return;
+    // 把已算出台幣的列依 parent 分組
+    const groups = new Map();
+    root.querySelectorAll(".dtwd-badge[data-dtwd-total]").forEach((b) => {
+      const row = b.closest("tr, li");
+      if (!row || !row.parentElement) return;
+      const total = parseFloat(b.dataset.dtwdTotal);
+      if (!Number.isFinite(total)) return;
+      const arr = groups.get(row.parentElement) || [];
+      arr.push({ row, total });
+      groups.set(row.parentElement, arr);
+    });
+
+    groups.forEach((items, parent) => {
+      if (items.length < 2) return;
+      const sorted = items.slice().sort((a, b) => a.total - b.total);
+      // 取得目前這些列在 parent 內的實際順序
+      const sortedSet = new Set(sorted.map((s) => s.row));
+      const currentOrder = Array.from(parent.children).filter((c) => sortedSet.has(c));
+      const targetOrder = sorted.map((s) => s.row);
+      let same = true;
+      for (let i = 0; i < targetOrder.length; i++) {
+        if (currentOrder[i] !== targetOrder[i]) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return; // 順序已正確，避免觸發 observer
+      // 重排：把已算出台幣的列照順序 append 到 parent 尾端，
+      // 沒算出台幣的列保留在原本相對位置
+      targetOrder.forEach((r) => parent.appendChild(r));
     });
   }
 
@@ -266,8 +306,12 @@
     if (!SETTINGS.enabled) return;
     removeUnavailable(document);
     if (!RATES) return;
-    if (IS_CHECKOUT) scanCheckout(document);
-    else scanListings(document);
+    if (IS_CHECKOUT) {
+      scanCheckout(document);
+    } else {
+      scanListings(document);
+      sortByTWD(document);
+    }
   }
 
   let pending = false;
