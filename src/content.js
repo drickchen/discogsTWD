@@ -168,7 +168,12 @@
       }
 
       const r = computeTWD(item, ship);
-      if (r) el.insertAdjacentElement("afterend", landedBadge(r));
+      if (r) {
+        // 如果 .price 被包在 <a> 裡，徽章插在 <a> 之後，避免污染 React 管理的連結子樹
+        const anchor = el.closest("a");
+        const target = anchor && anchor.contains(el) ? anchor : el;
+        target.insertAdjacentElement("afterend", landedBadge(r));
+      }
     });
   }
 
@@ -302,15 +307,40 @@
 
   // ---- 排程與監看 ----------------------------------------------------------
 
+  const OBS_OPTS = { childList: true, subtree: true };
+  let observer = null;
+  let sortedOnce = false;
+  let lastUrl = location.href;
+
+  function pauseObserver() {
+    if (observer) observer.disconnect();
+  }
+  function resumeObserver() {
+    if (observer) observer.observe(document.documentElement, OBS_OPTS);
+  }
+
   function processAll() {
     if (!SETTINGS.enabled) return;
-    removeUnavailable(document);
-    if (!RATES) return;
-    if (IS_CHECKOUT) {
-      scanCheckout(document);
-    } else {
-      scanListings(document);
-      sortByTWD(document);
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      sortedOnce = false;
+    }
+    pauseObserver();
+    try {
+      removeUnavailable(document);
+      if (RATES) {
+        if (IS_CHECKOUT) {
+          scanCheckout(document);
+        } else {
+          scanListings(document);
+          if (!sortedOnce) {
+            sortByTWD(document);
+            sortedOnce = true;
+          }
+        }
+      }
+    } finally {
+      resumeObserver();
     }
   }
 
@@ -325,10 +355,8 @@
   }
 
   function observe() {
-    new MutationObserver(scheduleScan).observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
+    observer = new MutationObserver(scheduleScan);
+    resumeObserver();
   }
 
   // ---- 啟動 ----------------------------------------------------------------
